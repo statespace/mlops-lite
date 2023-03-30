@@ -1,9 +1,7 @@
-import inspect
-import sys
-import mlopslite
+from mlopslite.client import MlopsLite
+
 
 
 if __name__ == "__main__":
-
-    clsmembers = inspect.getmembers(sys.modules[__name__], inspect.isclass)
-    print(clsmembers)
+    
+    test = MlopsLite()

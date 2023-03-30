@@ -1,25 +1,37 @@
-from registry.db import DataBase
-from artifacts.dataset import DataSet
+from mlopslite.registry.db import DataBase
+from mlopslite.artifacts.dataset import DataSet
+from mlopslite.artifacts.pipeline import ModelPipe
+import pandas as pd
 
 class MlopsLite:
 
     """
     Main class that implements control over the registry - pushing and pulling artifacts
+
+    Expected training workflow:
+        - register / bind dataset
+        - pull it from DB
+        - SKlearn loop -> Pipeline (API definitions should perfectly match) -> joblib
+        - push joblib as bytes to registry + precalc all all the stats in json
+        - cross compare Pipelines that are bound to same dataset (again, mlops does all the stats)
     """
 
     def __init__(self) -> None:
 
         # set up DB object
         self.db = DataBase() # default to sqlite, workspace folder sqlite/mlops-lite.db
-        self.dataset = DataSet()
+        
 
-    def bind_dataset(self, id) -> None:
-        self.dataset.bind(id)
+    def bind_dataset(self, id: int) -> None:
+        self.dataset = DataSet()
 
     def register_dataset(self, dataset, target) -> None:
         self.dataset.register(dataset, target)
 
-    def list_datasets(self) -> dict:
+    def list_datasets(self) -> pd.DataFrame:
+        return DataSet.list(self.db)
+
+    def register_model(self, pipeline: ModelPipe) -> None:
         pass
 
     

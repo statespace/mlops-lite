@@ -18,8 +18,8 @@ class DataRegistry(Base):
     version = Column(Integer)
     description = Column(String)
     data = Column(JSON)
-    rows = Column(Integer)
-    columns = Column(Integer)
+    row_size = Column(Integer)
+    col_size = Column(Integer)
 
 class DataDefinitions(Base):
     __tablename__ = "data_definitions"

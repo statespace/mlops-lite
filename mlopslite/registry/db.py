@@ -1,30 +1,75 @@
-import sqlalchemy
 import os
-import sys
-import inspect
+import pandas as pd
+from sqlalchemy import create_engine, inspect
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.sql import Select
+from mlopslite.registry.datamodel import Base, get_datamodel_table_names
+from alembic.config import Config
+from alembic import command
+from time import time
 
-from datamodel import (
-    DataRegistry,
-    DataDefinitions
-)
-
-from datamodel import get_datamodel_table_names
-
-def default_sqlite_uri() -> str:
-    return "sqlite:///sqlite/mlops-lite.db"
+DEFAULT_SQLITE_URL = "sqlite:///mlops-lite.db"
 
 class DataBase:
 
-    def __init__(self, db_uri: str | None = default_sqlite_uri()) -> None:
-        self.engine = sqlalchemy.create_engine(db_uri)
-        self.session = sqlalchemy.orm.sessionmaker(bind=self.engine)
+    def __init__(self, db_url: str | None = DEFAULT_SQLITE_URL) -> None:
+        self.url = db_url
+        self.engine = create_engine(db_url)
+        self.session = sessionmaker(bind=self.engine)
 
         # check if DB is up to date / or exists at all
-        db_tables = sqlalchemy.inspect(self.engine).get_table_names()
+        db_tables = inspect(self.engine).get_table_names()
         datamodel_tables = get_datamodel_table_names()
         if not all([i in db_tables for i in datamodel_tables]): # this does not ensure that all columns within tables are as expected!
             print('DB is not complete') # procede with migration
+            self._upgrade_db()
+        else:
+            print("Database Ready!")
+
+    def _upgrade_db(self):
+        config = Config('alembic.ini')
+        config.set_main_option("sqlalchemy.url", self.url)
+
+        with self.engine.connect() as connection:
+            config.attributes["connection"] = connection
+            command.revision(config, f"{int(time())}_update", autogenerate=True)
+            command.upgrade(config, "heads")
+
     
+    def execute_select_query(self, statement: Select) -> pd.DataFrame:
+
+        '''
+        Returns query in pd.DataFrame form
+        '''
+
+        with self.session.begin() as con:
+            result = con.execute(statement)
+            keys = result.keys()
+            data = result.all()
+            
+            dataset = [{k:v for k,v in zip(keys,item)} for item in data]
+            
+            df = pd.DataFrame(dataset)
+
+        return df
+    
+    def execute_select_query_single(self, statement: Select):
+
+        with self.session.begin() as con:
+            result = con.execute(statement)
+            data = result.all()
+
+        return data[0][0]
+    
+    def execute_insert_query_single(self, model: Base):
+
+        with self.session.begin() as con:
+            con.add(model)
+            con.commit()
+
+
+    #### implementing other DBs
+
     @staticmethod
     def construct_uri_from_env():
 
@@ -40,5 +85,7 @@ class DataBase:
         constring = f'{db_conn}://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}'
 
         return constring
+
+
     
 
