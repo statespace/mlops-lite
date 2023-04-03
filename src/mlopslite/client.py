@@ -1,7 +1,9 @@
-from mlopslite.registry.db import DataBase
-from mlopslite.artifacts.dataset import DataSet
-from mlopslite.artifacts.pipeline import ModelPipe
 import pandas as pd
+
+from .artifacts.dataset import DataSet
+from .artifacts.pipeline import ModelPipe
+from .registry.db import DataBase
+
 
 class MlopsLite:
 
@@ -17,10 +19,8 @@ class MlopsLite:
     """
 
     def __init__(self) -> None:
-
         # set up DB object
-        self.db = DataBase() # default to sqlite, workspace folder sqlite/mlops-lite.db
-        
+        self.db = DataBase()  # default to sqlite, workspace folder sqlite/mlops-lite.db
 
     def bind_dataset(self, id: int) -> None:
         self.dataset = DataSet()
@@ -33,7 +33,3 @@ class MlopsLite:
 
     def register_model(self, pipeline: ModelPipe) -> None:
         pass
-
-    
-
-
