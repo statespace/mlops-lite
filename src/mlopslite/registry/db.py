@@ -1,20 +1,20 @@
-import os
+from time import time
+
 import pandas as pd
+from alembic import command
+from alembic.config import Config
 from sqlalchemy import create_engine, inspect
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import Select
-from mlopslite.registry.datamodel import Base, get_datamodel_table_names
-from alembic.config import Config
-from alembic import command
-from time import time
 
-DEFAULT_SQLITE_URL = "sqlite:///mlops-lite.db"
+from mlopslite.registry.datamodel import Base, get_datamodel_table_names
+from mlopslite.registry.registryconfig import RegistryConfig
 
 
 class DataBase:
-    def __init__(self, db_url: str = DEFAULT_SQLITE_URL) -> None:
-        self.url = db_url
-        self.engine = create_engine(db_url)
+    def __init__(self, config: RegistryConfig) -> None:
+        self.url = config.db_constring
+        self.engine = create_engine(self.url)
         self.session = sessionmaker(bind=self.engine)
 
         # check if DB is up to date / or exists at all
@@ -65,18 +65,3 @@ class DataBase:
             con.commit()
 
     #### implementing other DBs
-
-    @staticmethod
-    def construct_uri_from_env():
-        # meant for connecting to Postgres, probably needs a config that defines DB choice
-
-        db_conn = os.environ["DB_CONNECTION"]
-        db_user = os.environ["DB_USERNAME"]
-        db_pass = os.environ["DB_PASSWORD"]
-        db_host = "localhost" if "TEST" in os.environ else os.environ["DB_HOST"]
-        db_port = os.environ["DB_PORT"]
-        db_name = os.environ["DB_DATABASE"]
-
-        constring = f"{db_conn}://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}"
-
-        return constring
