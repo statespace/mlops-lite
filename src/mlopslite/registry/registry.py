@@ -1,122 +1,74 @@
-from dataclasses import dataclass
+import json
+from hashlib import md5
 
 import pandas as pd
 
+from mlopslite.artifacts.metadata import ColumnMetadata, DataSetMetadata
 from mlopslite.artifacts.dataset import DataSet
-from mlopslite.artifacts.dataset_metadata import DataSetMetadata
 from mlopslite.registry import datamodel
 from mlopslite.registry.db import DataBase
-from mlopslite.registry.filesystem import FileSystem
 from mlopslite.registry.registryconfig import RegistryConfig
 
 
 class Registry:
-    def __init__(self, config: RegistryConfig):
-        pass
+    def __init__(self, config: RegistryConfig = RegistryConfig()):
+        self.db = DataBase(config=config)
+        self.config = config
 
     # db: DataBase
     # fs: FileSystem
     # config: RegistryConfig
 
     def pull_dataset_from_registry(self, id: int) -> DataSet:
-        pass
+        ds = self.db.select_dataset_by_id(id)
 
-    def push_dataset_to_registry(
-        self, dataset: str, metadata: DataSetMetadata
-    ) -> int:
-        
+        dataset = ds["dataset"]["data"]
+
+        dtype_map = {i["column_name"]: i["original_dtype"] for i in ds["columns"]}
+        dataset = pd.DataFrame(dataset).astype(dtype=dtype_map)
+
+        metadata = DataSetMetadata.create(
+            data = dataset, 
+            name = ds["dataset"]["name"], 
+            version = ds["dataset"]["version"], 
+            description=ds["dataset"]["description"]
+        )
+
+        return DataSet(data=dataset, metadata=metadata)
+
+    def push_dataset_to_registry(self, data: dict, metadata: DataSetMetadata) -> dict:
         """
         Add new dataset to the registry
         """
-        
-        # create DataSet metadata
 
+        # compute hash of data
+        hash = self.get_data_hash(data)
+        registry_ref = self.db.get_reference_by_hash(hash)
+        if registry_ref is not None:
+            print("Dataset already exists, returning reference instead of pushing!")
+            return registry_ref
 
-        self.db.execute_insert_query_single(dm)
+        # dataset table
 
-        @staticmethod
-    def register(
-        registry: Registry,
-        dataset: pd.DataFrame | dict,
-        target: str,
-        name: str,
-        description: str = "",
-    ):
-        # check if valid
-        if not self._check_valid(dataset=dataset):
-            raise ValueError("Invalid data")
-
-        df = convert_to_pandas(dataset=dataset)
-
-        # construct metadata
-        metadata = DataSetMetadata.create(
-            df=df, target=target, name=name, description=description
-        )
-        # transform to unified format
-        conv_data = convert_df_to_dict(df=df, metadata=metadata)
-        # create hash and check against DB for existing datasets
-        hash = md5(conv_data.encode("utf-8")).hexdigest()
-        registry_ref = self._check_hash_in_registry(hash)
-
-        if registry_ref is None:
-            registry_ref = push_dataset_to_registry()
-
-        pull_dataset_from_registry(registry_ref)
-
-    def _check_valid(self, dataset: pd.DataFrame | dict) -> bool:
-        # TODO: check if various possible input types can be coerced to pd.DataFrame
-        # TODO: return checklist instead of bool
-        return isinstance(dataset, pd.DataFrame)
-
-    def _check_hash_in_registry(self, hash: str) -> int | None:
-        pass
-
-    @staticmethod
-    def list(db: DataBase) -> pd.DataFrame:
-        """
-        List all datasets in registry
-        """
-
-        statement = select(
-            datamodel.DataRegistry.id,
-            datamodel.DataRegistry.name,
-            datamodel.DataRegistry.description,
-            datamodel.DataRegistry.row_size,
-            datamodel.DataRegistry.col_size,
+        dr = datamodel.DataRegistry(
+            name=metadata.name,
+            version=self.db.get_dataset_version_increment(metadata.name),
+            description=metadata.description,
+            data=data,
+            size_rows=metadata.size_rows,
+            size_cols=metadata.size_cols,
+            hash=hash,
         )
 
-        return db.execute_select_query(statement)
+        for i in metadata.column_metadata:
+            drc = datamodel.DataRegistryColumns(**i.__dict__, data = dr)
+            dr.columns.append(drc)
 
-    def load(self, db: DataBase, id: int) -> None:
-        """
-        Load and attach dataset + metadata to instance
-        """
+        registry_ref = self.db.insert_dataset_returning_reference(dr)
 
-        statement = select(datamodel.DataRegistry.data).where(
-            datamodel.DataRegistry.id == id
-        )
+        return registry_ref
 
-
-def convert_to_pandas(dataset: pd.DataFrame | dict) -> pd.DataFrame:
-    # depending on input data types, transform to pd.DataFrame
-    if isinstance(dataset, dict):
-        dataset = pd.DataFrame(dataset)
-    return dataset
-
-
-def convert_df_to_dict(df: pd.DataFrame, metadata: DataSetMetadata) -> str:
-    nonetypes = [np.nan, None]
-    conv_dict = df.to_dict("list")
-
-    # check if match cols
-    if not all([i in conv_dict.keys() for i in metadata.converted_dtypes]):
-        raise Exception("Mismatch in columns!")
-
-    out = {}
-    for k, v in conv_dict.items():
-        target_type = metadata.converted_dtypes[k]
-        out[k] = [target_type(i) if i not in nonetypes else None for i in v]
-
-    out = json.dumps(out, sort_keys=True, indent=2)
-
-    return out
+    def get_data_hash(self, data: dict) -> str:
+        return md5(
+            json.dumps(data, indent=2, sort_keys=True).encode("utf-8")
+        ).hexdigest()

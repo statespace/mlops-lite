@@ -1,13 +1,14 @@
 from time import time
 
-import pandas as pd
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import create_engine, func, inspect, select
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import Select
 
-from mlopslite.registry.datamodel import Base, get_datamodel_table_names
+from mlopslite.registry.datamodel import (Base, DataRegistry,
+                                          DataRegistryColumns,
+                                          get_datamodel_table_names)
 from mlopslite.registry.registryconfig import RegistryConfig
 
 
@@ -31,12 +32,14 @@ class DataBase:
         config = Config("alembic.ini")
         config.set_main_option("sqlalchemy.url", self.url)
 
+        #print(config)
+
         with self.engine.connect() as connection:
             config.attributes["connection"] = connection
             command.revision(config, f"{int(time())}_update", autogenerate=True)
             command.upgrade(config, "heads")
 
-    def execute_select_query(self, statement: Select) -> pd.DataFrame:
+    def execute_select_query(self, statement: Select) -> list[dict]:
         """
         Returns query in pd.DataFrame form
         """
@@ -46,11 +49,9 @@ class DataBase:
             keys = result.keys()
             data = result.all()
 
-            dataset = [{k: v for k, v in zip(keys, item)} for item in data]
+            response = [{k: v for k, v in zip(keys, item)} for item in data]
 
-            df = pd.DataFrame(dataset)
-
-        return df
+        return response
 
     def execute_select_query_single(self, statement: Select):
         with self.session.begin() as con:
@@ -64,4 +65,49 @@ class DataBase:
             con.add(model)
             con.commit()
 
-    #### implementing other DBs
+    def get_dataset_version_increment(self, name: str) -> int:
+        stmt = (
+            select(func.max(DataRegistry.version).label("version"))
+            .where(DataRegistry.name == name)
+            .group_by(DataRegistry.name)
+        )
+
+        response = self.execute_select_query(stmt)
+
+        if len(response) == 0:
+            return 1
+        else:
+            return response[0]["version"] + 1
+
+    def get_reference_by_hash(self, hash: str) -> dict | None:
+        stmt = select(
+            DataRegistry.id,
+            DataRegistry.name,
+            DataRegistry.version,
+            DataRegistry.hash,
+        ).where(DataRegistry.hash == hash)
+
+        response = self.execute_select_query(stmt)
+        return None if len(response) == 0 else response[0]
+
+    def insert_dataset_returning_reference(self, dr: DataRegistry) -> dict:
+        with self.session.begin() as session:
+            session.add(dr)
+            session.commit()
+
+            out = {"id": dr.id, "name": dr.name, "version": dr.version, "hash": dr.hash}
+
+            return out
+
+    def select_dataset_by_id(self, id: int) -> dict:
+        stmt_dataset = select(*DataRegistry.__table__.columns).where(
+            DataRegistry.id == id
+        )
+        stmt_columns = select(*DataRegistryColumns.__table__.columns).where(
+            DataRegistryColumns.data_registry_id == id
+        )
+
+        return {
+            "dataset": self.execute_select_query(stmt_dataset)[0],
+            "columns": self.execute_select_query(stmt_columns),
+        }

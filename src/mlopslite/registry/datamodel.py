@@ -1,6 +1,10 @@
-from sqlalchemy.orm import DeclarativeBase
-from sqlalchemy import Column, String, Integer, JSON, ForeignKey
-import inspect, sys
+import inspect
+import sys
+from typing import Any, List
+
+from sqlalchemy import ARRAY, JSON, ForeignKey, UniqueConstraint, String
+from sqlalchemy.orm import (DeclarativeBase, Mapped, MappedAsDataclass,
+                            mapped_column, relationship)
 
 
 def get_datamodel_table_names():
@@ -11,26 +15,43 @@ def get_datamodel_table_names():
     return [cl.__tablename__ for name, cl in clsmembers if name != "Base"]
 
 
-class Base(DeclarativeBase):
-    pass
+class Base(DeclarativeBase, MappedAsDataclass):
+    type_annotation_map = {dict[str, Any]: JSON}
 
 
 class DataRegistry(Base):
     __tablename__ = "data_registry"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String)
-    version = Column(Integer)
-    description = Column(String)
-    data = Column(JSON)
-    row_size = Column(Integer)
-    col_size = Column(Integer)
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True, init=False)
+    name: Mapped[str]
+    version: Mapped[int]
+    description: Mapped[str]
+    data: Mapped[dict[str, Any]]
+    size_cols: Mapped[int]
+    size_rows: Mapped[int]
+    hash: Mapped[str] = mapped_column(unique=True)
+
+    columns: Mapped[List["DataRegistryColumns"]] = relationship(
+        default_factory=list, back_populates="data", cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (UniqueConstraint("name", "version"),)
 
 
-class DataDefinitions(Base):
-    __tablename__ = "data_definitions"
+class DataRegistryColumns(Base):
+    __tablename__ = "data_registry_columns"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    data_id = Column(Integer, ForeignKey("data_registry.id"))
-    column = Column(String)
-    dtype = Column(String)
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True, init=False)
+    data_registry_id: Mapped[int] = mapped_column(
+        ForeignKey("data_registry.id"), init=False
+    )
+    column_name: Mapped[str]
+    original_dtype: Mapped[str]
+    converted_dtype: Mapped[str]
+    null_count: Mapped[int]
+    unique_count: Mapped[int]
+    min_value_num: Mapped[float] = mapped_column(nullable=True)
+    max_value_num: Mapped[float] = mapped_column(nullable=True)
+    #unique_values: Mapped[list[str]]
+
+    data: Mapped["DataRegistry"] = relationship(back_populates="columns")
