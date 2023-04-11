@@ -2,7 +2,7 @@ from time import time
 
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import create_engine, func, inspect, select
+from sqlalchemy import create_engine, func, inspect, select, delete, insert
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import Select
 
@@ -93,10 +93,11 @@ class DataBase:
     def insert_dataset_returning_reference(self, dr: DataRegistry) -> dict:
         with self.session.begin() as session:
             session.add(dr)
-            session.commit()
-
+            session.flush()
             out = {"id": dr.id, "name": dr.name, "version": dr.version, "hash": dr.hash}
-
+            #session.commit()
+            #stmt = insert(dr).returning(dr.id, dr.name, dr.version)
+            #return self.execute_select_query(stmt)
             return out
 
     def select_dataset_by_id(self, id: int) -> dict:
@@ -111,3 +112,22 @@ class DataBase:
             "dataset": self.execute_select_query(stmt_dataset)[0],
             "columns": self.execute_select_query(stmt_columns),
         }
+    
+    def list_datasets(self) -> dict:
+
+        stmt = (select(DataRegistry.id,
+                      DataRegistry.name,
+                      DataRegistry.version,
+                      DataRegistry.size_cols,
+                      DataRegistry.size_rows,
+                      DataRegistry.description)
+                .order_by(DataRegistry.id)
+        )
+        
+        return self.execute_select_query(stmt)
+    
+    def delete_dataset(self, id: int):
+
+        with self.session.begin() as session:
+            stmt = delete(DataRegistry).where(DataRegistry.id == id)
+            session.execute(stmt)

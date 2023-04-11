@@ -11,7 +11,7 @@ from mlopslite.registry.registryconfig import RegistryConfig
 
 
 class Registry:
-    def __init__(self, config: RegistryConfig = RegistryConfig()):
+    def __init__(self, config: RegistryConfig):
         self.db = DataBase(config=config)
         self.config = config
 
@@ -36,39 +36,38 @@ class Registry:
 
         return DataSet(data=dataset, metadata=metadata)
 
-    def push_dataset_to_registry(self, data: dict, metadata: DataSetMetadata) -> dict:
+    def push_dataset_to_registry(self, dataset: DataSet) -> dict:
         """
         Add new dataset to the registry
         """
 
+        hash = dataset.get_data_hash()
+
         # compute hash of data
-        hash = self.get_data_hash(data)
+        
         registry_ref = self.db.get_reference_by_hash(hash)
         if registry_ref is not None:
             print("Dataset already exists, returning reference instead of pushing!")
-            return registry_ref
+            return self.pull_dataset_from_registry(id = registry_ref['id'])
 
         # dataset table
 
         dr = datamodel.DataRegistry(
-            name=metadata.name,
-            version=self.db.get_dataset_version_increment(metadata.name),
-            description=metadata.description,
-            data=data,
-            size_rows=metadata.size_rows,
-            size_cols=metadata.size_cols,
+            name=dataset.metadata.name,
+            version=self.db.get_dataset_version_increment(dataset.metadata.name),
+            description=dataset.metadata.description,
+            data=dataset.convert_to_dict(),
+            size_rows=dataset.metadata.size_rows,
+            size_cols=dataset.metadata.size_cols,
             hash=hash,
         )
 
-        for i in metadata.column_metadata:
+        for i in dataset.metadata.column_metadata:
             drc = datamodel.DataRegistryColumns(**i.__dict__, data = dr)
             dr.columns.append(drc)
 
         registry_ref = self.db.insert_dataset_returning_reference(dr)
 
-        return registry_ref
+        return self.pull_dataset_from_registry(id = registry_ref['id'])
 
-    def get_data_hash(self, data: dict) -> str:
-        return md5(
-            json.dumps(data, indent=2, sort_keys=True).encode("utf-8")
-        ).hexdigest()
+

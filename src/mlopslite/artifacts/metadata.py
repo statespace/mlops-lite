@@ -2,7 +2,6 @@ from dataclasses import dataclass
 
 import pandas as pd
 
-
 @dataclass
 class ColumnMetadata:
     column_name: str
@@ -16,18 +15,20 @@ class ColumnMetadata:
 
     @staticmethod
     def create(key, column: pd.Series) -> "ColumnMetadata":
+
+        #nonetypes = [np.nan, None]
         # summarize col
         summary = {
             "column_name": key,
             "original_dtype": str(column.dtype),
             "converted_dtype": translate_type_to_primitive(column.dtype),
-            "null_count": len([i for i in column if i is None]),
-            "unique_count": len(set([i for i in column if i is not None])),
+            "null_count": len([i for i in column if pd.isna(i)]),
+            "unique_count": len(set([i for i in column if not pd.isna(i)])),
         }
 
         if summary["converted_dtype"] in ["int", "float"]:
-            summary["min_value_num"] = float(min([i for i in column if i is not None]))
-            summary["max_value_num"] = float(max([i for i in column if i is not None]))
+            summary["min_value_num"] = float(min([i for i in column if not pd.isna(i)]))
+            summary["max_value_num"] = float(max([i for i in column if not pd.isna(i)]))
             #summary["unique_val_str"] = None
         else:
             summary["min_value_num"] = None
@@ -47,7 +48,7 @@ def translate_type_to_primitive(dtype):
 @dataclass
 class DataSetMetadata:
     name: str
-    version: int
+    version: int | None
     description: str
     size_cols: int
     size_rows: int

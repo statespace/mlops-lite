@@ -1,8 +1,8 @@
 import pandas as pd
 
-from mlopslite.artifacts.dataset import DataSet, convert_df_to_dict
+from mlopslite.artifacts.dataset import DataSet
 from mlopslite.registry.registry import Registry
-from mlopslite.artifacts.metadata import DataSetMetadata
+from mlopslite.registry.registryconfig import RegistryConfig
 
 
 class MlopsLite:
@@ -18,47 +18,27 @@ class MlopsLite:
         - cross compare Pipelines that are bound to same dataset (again, mlops does all the stats)
     """
 
-    def __init__(self) -> None:
-        # set up DB object
-        self.registry = Registry()  # default to sqlite, workspace folder sqlite/mlops-lite.db
+    def __init__(self, config: RegistryConfig = RegistryConfig()) -> None:
+        # set up Registry object
+        self.registry = Registry(config=config)  # default to sqlite, workspace folder sqlite/mlops-lite.db
 
-    def bind_dataset(self, id: int) -> None:
-        self.dataset = DataSet()
+    def create_dataset(self, data, name: str, description: str = "", push: bool = True):
+        dataset = DataSet.create(data = data, name = name, description=description)
+        if push:
+            self.push_dataset(dataset=dataset)
+        else:
+            self.dataset = dataset
 
-    def register_dataset(self, dataset, target) -> None:
-        self.dataset.register(dataset, target)
+    def pull_dataset(self, id: int) -> None:
+        self.dataset = self.registry.pull_dataset_from_registry(id = id)
+
+    def push_dataset(self, dataset: DataSet) -> None:
+        self.dataset = self.registry.push_dataset_to_registry(dataset=dataset)
 
     def list_datasets(self) -> pd.DataFrame:
-        return DataSet.list(self.db)
-
-def dataset_from_registry(registry: Registry, id: int) -> DataSet:
-    return registry.pull_dataset_from_registry(id=id)
-
-
-def dataset_from_object(
-    registry: Registry, obj: pd.DataFrame | dict, name: str, description: str = ""
-) -> DataSet:
-    data = pd.DataFrame(obj)
-
-    metadata = DataSetMetadata.create(
-        data=data,
-        name=name,
-        version=registry.db.get_dataset_version_increment(name),
-        description=description,
-    )
-
-    json_data = convert_df_to_dict(data, metadata)
-
-    registry_ref = registry.push_dataset_to_registry(data=json_data, metadata=metadata)
-
-    return dataset_from_registry(registry=registry, id=registry_ref["id"])
+        
+        dslist = self.registry.db.list_datasets()
+        return pd.DataFrame(dslist)
 
 
-def dataset_from_csv(
-    registry: Registry, path: str, name: str, description: str = ""
-) -> DataSet:
-    data = pd.read_csv(path)
 
-    return dataset_from_object(
-        registry=registry, obj=data, name=name, description=description
-    )
