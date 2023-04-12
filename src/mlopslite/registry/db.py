@@ -2,7 +2,7 @@ from time import time
 
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import create_engine, func, inspect, select, delete, insert
+from sqlalchemy import create_engine, func, inspect, select, delete
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import Select
 
@@ -10,6 +10,7 @@ from mlopslite.registry.datamodel import (Base, DataRegistry,
                                           DataRegistryColumns,
                                           get_datamodel_table_names)
 from mlopslite.registry.registryconfig import RegistryConfig
+from mlopslite.alembic_setup import get_alembic_ini, get_migration_script_location
 
 
 class DataBase:
@@ -23,20 +24,23 @@ class DataBase:
         datamodel_tables = get_datamodel_table_names()
         if not all([i in db_tables for i in datamodel_tables]):
             # this does not ensure that all columns within tables are as expected!
+            # needs to thoroughly against the datamodel... can this be done via Base against engine?
             print("DB is not complete")  # procede with migration
             self._upgrade_db()
         else:
             print("Database Ready!")
 
     def _upgrade_db(self):
-        config = Config("alembic.ini")
+        config = Config(get_alembic_ini())
+        config.set_main_option("script_location", get_migration_script_location())
         config.set_main_option("sqlalchemy.url", self.url)
 
         #print(config)
 
         with self.engine.connect() as connection:
             config.attributes["connection"] = connection
-            command.revision(config, f"{int(time())}_update", autogenerate=True)
+            # there should probably be a script that regenerates migrations on version update..?
+            #command.revision(config, f"{int(time())}_update", autogenerate=True) 
             command.upgrade(config, "heads")
 
     def execute_select_query(self, statement: Select) -> list[dict]:
