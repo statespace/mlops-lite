@@ -2,7 +2,7 @@ import inspect
 import sys
 from typing import Any, List
 
-from sqlalchemy import ARRAY, JSON, ForeignKey, UniqueConstraint, String
+from sqlalchemy import JSON, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import (DeclarativeBase, Mapped, MappedAsDataclass,
                             mapped_column, relationship)
 
@@ -55,3 +55,23 @@ class DataRegistryColumns(Base):
     #unique_values: Mapped[list[str]]
 
     data: Mapped["DataRegistry"] = relationship(back_populates="columns")
+
+class ModelRegistry(Base):
+    __tablename__ = "model_registry"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True, init=False)
+    data_registry_id: Mapped[int] = mapped_column(
+        ForeignKey("data_registry.id"), init=False
+    )
+    name: Mapped[str]
+    version: Mapped[int]
+    target: Mapped[str]
+    target_mapping: Mapped[dict[str, Any] | None]
+    description: Mapped[str]
+    estimator_type: Mapped[str]
+    estimator_class: Mapped[str]
+    deployable: Mapped[bytes]
+    variables: Mapped[dict[str, str]]
+    hash: Mapped[str]
+
+

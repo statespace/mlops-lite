@@ -1,10 +1,8 @@
-import json
-from hashlib import md5
-
 import pandas as pd
 
 from mlopslite.artifacts.metadata import ColumnMetadata, DataSetMetadata
 from mlopslite.artifacts.dataset import DataSet
+from mlopslite.artifacts.model import Deployable
 from mlopslite.registry import datamodel
 from mlopslite.registry.db import DataBase
 from mlopslite.registry.registryconfig import RegistryConfig
@@ -31,6 +29,7 @@ class Registry:
             data = dataset, 
             name = ds["dataset"]["name"], 
             version = ds["dataset"]["version"], 
+            id = ds['dataset']['id'],
             description=ds["dataset"]["description"]
         )
 
@@ -41,14 +40,11 @@ class Registry:
         Add new dataset to the registry
         """
 
-        hash = dataset.get_data_hash()
-
-        # compute hash of data
-        
-        registry_ref = self.db.get_reference_by_hash(hash)
+        hash = dataset.get_data_hash()        
+        registry_ref = self.db.get_dataset_reference_by_hash(hash)
         if registry_ref is not None:
-            print("Dataset already exists, returning reference instead of pushing!")
-            return self.pull_dataset_from_registry(id = registry_ref['id'])
+            print("Dataset already exists, returning referenced dataset instead of pushing!")
+            return registry_ref
 
         # dataset table
 
@@ -68,6 +64,37 @@ class Registry:
 
         registry_ref = self.db.insert_dataset_returning_reference(dr)
 
-        return self.pull_dataset_from_registry(id = registry_ref['id'])
+        return registry_ref
+    
+    def push_model_to_registry(self, model: Deployable) -> dict:
+
+        hash = model.get_data_hash()
+        registry_ref = self.db.get_model_reference_by_hash(hash)
+        if registry_ref is not None:
+            print("Model already exists, returning referenced model instead of pushing!")
+            return registry_ref
+        
+        mr = datamodel.ModelRegistry(
+            name=model.name, 
+            version=self.db.get_model_version_increment(name = model.name, dataset_id=model.dataset_id, target = model.target),
+            data_registry_id = model.dataset_id,
+            description=model.description,
+            deployable=model.get_serialized_model(),
+            target = model.target, 
+            target_mapping=model.target_mapping, 
+            estimator_type=model.estimator_type, 
+            estimator_class=model.estimator_class
+            hash=hash
+        )
+
+        registry_ref = self.db.insert_model_returning_reference(mr=mr)
+
+        return registry_ref
+    
+    def pull_model_from_registry(self, id: int) -> Deployable:
+        model = self.db.select_model_by_id(id)
+        return Deployable(**model)
+
+        
 
 

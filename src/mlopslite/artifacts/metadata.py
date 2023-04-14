@@ -11,7 +11,7 @@ class ColumnMetadata:
     unique_count: int
     min_value_num: float
     max_value_num: float
-    #unique_val_str: list[str]
+    #unique_val_str: list[str] # not all DBs implement arrays, perhaps should go as many-to-one table
 
     @staticmethod
     def create(key, column: pd.Series) -> "ColumnMetadata":
@@ -49,6 +49,7 @@ def translate_type_to_primitive(dtype):
 class DataSetMetadata:
     name: str
     version: int | None
+    id: int | None
     description: str
     size_cols: int
     size_rows: int
@@ -56,11 +57,17 @@ class DataSetMetadata:
 
     @staticmethod
     def create(
-        data: pd.DataFrame, name: str, version: int, description: str
+        data: pd.DataFrame, 
+        name: str, 
+        version: int, 
+        description: str,
+        id: int | None = None
     ) -> "DataSetMetadata":
+        
         dataset_metadata = {
             "name": name,
             "version": version,
+            "id": id,
             "description": description,
             "size_cols": data.shape[1],
             "size_rows": data.shape[0],
@@ -68,5 +75,3 @@ class DataSetMetadata:
         }
 
         return DataSetMetadata(**dataset_metadata)
-
-

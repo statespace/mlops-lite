@@ -1,8 +1,11 @@
 import pandas as pd
+from typing import Any
 
 from mlopslite.artifacts.dataset import DataSet
 from mlopslite.registry.registry import Registry
 from mlopslite.registry.registryconfig import RegistryConfig
+from mlopslite.artifacts.model import Model
+
 
 
 class MlopsLite:
@@ -22,23 +25,56 @@ class MlopsLite:
         # set up Registry object
         self.registry = Registry(config=config)  # default to sqlite, workspace folder sqlite/mlops-lite.db
 
-    def create_dataset(self, data, name: str, description: str = "", push: bool = True):
+    def bind_dataset(self, data, name: str, description: str = "", push: bool = True):
         dataset = DataSet.create(data = data, name = name, description=description)
-        if push:
-            self.push_dataset(dataset=dataset)
-        else:
-            self.dataset = dataset
+        self.push_dataset(dataset=dataset)
 
     def pull_dataset(self, id: int) -> None:
         self.dataset = self.registry.pull_dataset_from_registry(id = id)
 
     def push_dataset(self, dataset: DataSet) -> None:
-        self.dataset = self.registry.push_dataset_to_registry(dataset=dataset)
+        # pushing also pulls back the dataset, to populate proper references
+        registry_ref = self.registry.push_dataset_to_registry(dataset=dataset)
+        self.pull_model(id = registry_ref['id'])
 
     def list_datasets(self) -> pd.DataFrame:
         
         dslist = self.registry.db.list_datasets()
         return pd.DataFrame(dslist)
 
+    def bind_model(
+            self, 
+            object, 
+            name: str, 
+            target: str, 
+            target_mapping: dict[str, Any] | None = None, 
+            description: str = ""
+    ) -> None:
 
+        model = Model(
+            deployable=object, 
+            dataset=self.dataset, 
+            name = name, 
+            target = target, 
+            target_mapping=target_mapping, 
+            description=description
+        )
 
+        self.push_model(model)
+
+        if model.dataset_id != self.dataset.metadata.id:
+            self.pull_dataset(id = model.dataset_id)
+
+    def pull_model(self, id: int) -> None:
+
+        self.model = self.registry.pull_model_from_registry(id = id)
+
+    def push_model(self, model: Model) -> None:
+        # pushing also pulls back the model, to populate proper references
+        registry_ref = self.registry.push_model_to_registry(model = model)
+        self.pull_model(id = registry_ref['id'])
+
+    def list_models(self) -> pd.DataFrame:
+
+        modlist = self.registry.db.list_models()
+        return pd.DataFrame(modlist)

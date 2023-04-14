@@ -2,11 +2,11 @@ from time import time
 
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import create_engine, func, inspect, select, delete
+from sqlalchemy import create_engine, func, inspect, select, delete, and_
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import Select
 
-from mlopslite.registry.datamodel import (Base, DataRegistry,
+from mlopslite.registry.datamodel import (Base, DataRegistry, ModelRegistry,
                                           DataRegistryColumns,
                                           get_datamodel_table_names)
 from mlopslite.registry.registryconfig import RegistryConfig
@@ -25,7 +25,7 @@ class DataBase:
         if not all([i in db_tables for i in datamodel_tables]):
             # this does not ensure that all columns within tables are as expected!
             # needs to thoroughly against the datamodel... can this be done via Base against engine?
-            print("DB is not complete")  # procede with migration
+            # print("DB is not complete")  # procede with migration
             self._upgrade_db()
         else:
             print("Database Ready!")
@@ -40,7 +40,8 @@ class DataBase:
         with self.engine.connect() as connection:
             config.attributes["connection"] = connection
             # there should probably be a script that regenerates migrations on version update..?
-            #command.revision(config, f"{int(time())}_update", autogenerate=True) 
+            #if regenerate:
+            #    command.revision(config, f"{int(time())}_update", autogenerate=True) 
             command.upgrade(config, "heads")
 
     def execute_select_query(self, statement: Select) -> list[dict]:
@@ -83,7 +84,7 @@ class DataBase:
         else:
             return response[0]["version"] + 1
 
-    def get_reference_by_hash(self, hash: str) -> dict | None:
+    def get_dataset_reference_by_hash(self, hash: str) -> dict | None:
         stmt = select(
             DataRegistry.id,
             DataRegistry.name,
@@ -135,3 +136,48 @@ class DataBase:
         with self.session.begin() as session:
             stmt = delete(DataRegistry).where(DataRegistry.id == id)
             session.execute(stmt)
+
+    def get_model_reference_by_hash(self, hash: str) -> dict:
+
+        stmt = select(
+            ModelRegistry.id,
+            ModelRegistry.name,
+            ModelRegistry.version,
+            ModelRegistry.hash
+        ).where(
+            ModelRegistry.hash == hash
+        )
+
+        response = self.execute_select_query(stmt)
+        return None if len(response) == 0 else response[0]
+    
+    def insert_model_returning_reference(self, mr: ModelRegistry) -> dict:
+        with self.session.begin() as session:
+            session.add(mr)
+            session.flush()
+            out = {"id": mr.id, "name": mr.name, "version": mr.version, "hash": mr.hash}
+
+            return out
+        
+    def get_model_version_increment(self, name: str, dataset_id: int, target: str) -> int:
+        stmt = (
+            select(func.max(ModelRegistry.version).label("version"))
+            .where(and_(ModelRegistry.name == name, ModelRegistry.data_registry_id == dataset_id, ModelRegistry.target == target))
+            .group_by(ModelRegistry.name)
+        )
+
+        response = self.execute_select_query(stmt)
+
+        if len(response) == 0:
+            return 1
+        else:
+            return response[0]["version"] + 1
+        
+    def select_model_by_id(self, id: int) -> dict:
+        stmt = select(*ModelRegistry.__table__.columns).where(
+            ModelRegistry.id == id
+        )
+
+        response = self.execute_select_query(stmt)
+
+        return response[0]
