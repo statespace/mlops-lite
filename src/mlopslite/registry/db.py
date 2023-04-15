@@ -181,3 +181,17 @@ class DataBase:
         response = self.execute_select_query(stmt)
 
         return response[0]
+    
+    def list_models(self):
+        
+        stmt = select(
+            ModelRegistry.id,
+            ModelRegistry.name,
+            ModelRegistry.version,
+            ModelRegistry.data_registry_id,
+            ModelRegistry.estimator_class,
+            ModelRegistry.estimator_type,
+            ModelRegistry.description
+        ).order_by(ModelRegistry.id)
+
+        return self.execute_select_query(stmt)

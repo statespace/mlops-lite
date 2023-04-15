@@ -66,25 +66,30 @@ class Registry:
 
         return registry_ref
     
-    def push_model_to_registry(self, model: Deployable) -> dict:
+    def push_model_to_registry(self, deployable: Deployable) -> dict:
 
-        hash = model.get_data_hash()
+        hash = deployable.get_data_hash()
         registry_ref = self.db.get_model_reference_by_hash(hash)
         if registry_ref is not None:
             print("Model already exists, returning referenced model instead of pushing!")
             return registry_ref
         
         mr = datamodel.ModelRegistry(
-            name=model.name, 
-            version=self.db.get_model_version_increment(name = model.name, dataset_id=model.dataset_id, target = model.target),
-            data_registry_id = model.dataset_id,
-            description=model.description,
-            deployable=model.get_serialized_model(),
-            target = model.target, 
-            target_mapping=model.target_mapping, 
-            estimator_type=model.estimator_type, 
-            estimator_class=model.estimator_class
-            hash=hash
+            data_registry_id = deployable.metadata.dataset_id,
+            name=deployable.metadata.name, 
+            version=self.db.get_model_version_increment(
+                name = deployable.metadata.name, 
+                dataset_id=deployable.metadata.dataset_id, 
+                target = deployable.metadata.target
+            ),
+            target = deployable.metadata.target, 
+            target_mapping=deployable.metadata.target_mapping, 
+            description=deployable.metadata.description,
+            estimator_type=deployable.metadata.estimator_type, 
+            estimator_class=deployable.metadata.estimator_class,
+            deployable=deployable.get_serialized_deployable(),
+            variables = deployable.metadata.variables,
+            hash=deployable.get_data_hash()
         )
 
         registry_ref = self.db.insert_model_returning_reference(mr=mr)

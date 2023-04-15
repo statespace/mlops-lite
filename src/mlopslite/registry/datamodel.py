@@ -61,7 +61,7 @@ class ModelRegistry(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True, init=False)
     data_registry_id: Mapped[int] = mapped_column(
-        ForeignKey("data_registry.id"), init=False
+        ForeignKey("data_registry.id")
     )
     name: Mapped[str]
     version: Mapped[int]
@@ -71,7 +71,7 @@ class ModelRegistry(Base):
     estimator_type: Mapped[str]
     estimator_class: Mapped[str]
     deployable: Mapped[bytes]
-    variables: Mapped[dict[str, str]]
+    variables: Mapped[dict[str, Any]]
     hash: Mapped[str]
 
 

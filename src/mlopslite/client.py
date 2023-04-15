@@ -4,7 +4,7 @@ from typing import Any
 from mlopslite.artifacts.dataset import DataSet
 from mlopslite.registry.registry import Registry
 from mlopslite.registry.registryconfig import RegistryConfig
-from mlopslite.artifacts.model import Model
+from mlopslite.artifacts.model import Deployable
 
 
 
@@ -35,7 +35,7 @@ class MlopsLite:
     def push_dataset(self, dataset: DataSet) -> None:
         # pushing also pulls back the dataset, to populate proper references
         registry_ref = self.registry.push_dataset_to_registry(dataset=dataset)
-        self.pull_model(id = registry_ref['id'])
+        self.pull_dataset(id = registry_ref['id'])
 
     def list_datasets(self) -> pd.DataFrame:
         
@@ -51,7 +51,7 @@ class MlopsLite:
             description: str = ""
     ) -> None:
 
-        model = Model(
+        model = Deployable.create(
             deployable=object, 
             dataset=self.dataset, 
             name = name, 
@@ -62,14 +62,14 @@ class MlopsLite:
 
         self.push_model(model)
 
-        if model.dataset_id != self.dataset.metadata.id:
-            self.pull_dataset(id = model.dataset_id)
+        if model.metadata.dataset_id != self.dataset.metadata.id:
+            self.pull_dataset(id = model.metadata.dataset_id)
 
     def pull_model(self, id: int) -> None:
 
         self.model = self.registry.pull_model_from_registry(id = id)
 
-    def push_model(self, model: Model) -> None:
+    def push_model(self, model: Deployable) -> None:
         # pushing also pulls back the model, to populate proper references
         registry_ref = self.registry.push_model_to_registry(model = model)
         self.pull_model(id = registry_ref['id'])

@@ -1,5 +1,5 @@
 from mlopslite.artifacts.dataset import DataSet
-from dataclasses import dataclass, field, InitVar
+from dataclasses import dataclass
 from sklearn.base import is_classifier, is_regressor
 from sklearn.pipeline import Pipeline
 import pickle
@@ -17,7 +17,7 @@ class DeployableMetadata:
     description: str
     estimator_type: str
     estimator_class: str
-    variables: dict[str, str]
+    variables: dict[str, Any]
 
 
 @dataclass
@@ -34,7 +34,7 @@ class Deployable:
             target: str, 
             target_mapping: dict | None = None, 
             description: str = ""
-    ) -> None:
+    ) -> 'Deployable':
 
         # potentially can implement various types of deployables
         # for now, extremely coupled with sklearn Pipeline
@@ -56,6 +56,16 @@ class Deployable:
         }
 
         return Deployable(deployable, DeployableMetadata(**metadata))
+    
+    @staticmethod
+    def restore(
+        deployable: bytes,
+        metadata: DeployableMetadata
+    ) -> 'Deployable':
+        
+        deployable = pickle.loads(deployable)
+        # check hash?
+        return Deployable(deployable, metadata)
 
     @property
     def classes(self):
@@ -133,7 +143,7 @@ def get_variables(deployable: Pipeline, dataset: DataSet):
     mod_vars = deployable.feature_names_in_
     col_meta = dataset.metadata.column_metadata
 
-    return {i['column_name']: i['converted_dtype'] for i in col_meta if i['column_name'] in mod_vars}
+    return {i.column_name: i.converted_dtype for i in col_meta if i.column_name in mod_vars}
 
 
 
