@@ -9,7 +9,7 @@ from hashlib import md5
 @dataclass
 class DeployableMetadata:
     id: int | None
-    dataset_id: int
+    dataset_registry_id: int
     name: str
     version: int | None
     target: str
@@ -44,7 +44,7 @@ class Deployable:
 
         metadata = {
             'id': None,
-            'dataset_id': dataset.metadata.id,
+            'dataset_registry_id': dataset.metadata.id,
             'name': name,
             'version': None,
             'target': target,
@@ -59,11 +59,13 @@ class Deployable:
     
     @staticmethod
     def restore(
-        deployable: bytes,
-        metadata: DeployableMetadata
+        registry_item: dict
     ) -> 'Deployable':
         
-        deployable = pickle.loads(deployable)
+        metadata = {key: val for key,
+            val in registry_item.items() if key in DeployableMetadata.__annotations__.keys()}
+        
+        deployable = pickle.loads(registry_item['deployable'])
         # check hash?
         return Deployable(deployable, metadata)
 
@@ -75,11 +77,11 @@ class Deployable:
     def estimator_class(self):
         return str(self.deployable[-1].__class__)
     
-    def get_serialized_deployable(self) -> bytes:
+    def serialize_deployable(self) -> bytes:
         return pickle.dumps(self.deployable)
     
     def get_data_hash(self) -> str:
-        return md5(self.get_serialized_deployable()).hexdigest()
+        return md5(self.serialize_deployable()).hexdigest()
     
     def predict(self, input):
 

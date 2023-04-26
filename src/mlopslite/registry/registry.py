@@ -1,6 +1,6 @@
 import pandas as pd
 
-from mlopslite.artifacts.metadata import ColumnMetadata, DataSetMetadata
+from mlopslite.artifacts.metadata import DataSetMetadata
 from mlopslite.artifacts.dataset import DataSet
 from mlopslite.artifacts.model import Deployable
 from mlopslite.registry import datamodel
@@ -48,7 +48,7 @@ class Registry:
 
         # dataset table
 
-        dr = datamodel.DataRegistry(
+        dr = datamodel.DatasetRegistry(
             name=dataset.metadata.name,
             version=self.db.get_dataset_version_increment(dataset.metadata.name),
             description=dataset.metadata.description,
@@ -59,7 +59,7 @@ class Registry:
         )
 
         for i in dataset.metadata.column_metadata:
-            drc = datamodel.DataRegistryColumns(**i.__dict__, data = dr)
+            drc = datamodel.DatasetRegistryColumns(**i.__dict__, data = dr)
             dr.columns.append(drc)
 
         registry_ref = self.db.insert_dataset_returning_reference(dr)
@@ -74,12 +74,12 @@ class Registry:
             print("Model already exists, returning referenced model instead of pushing!")
             return registry_ref
         
-        mr = datamodel.ModelRegistry(
-            data_registry_id = deployable.metadata.dataset_id,
+        mr = datamodel.DeployableRegistry(
+            dataset_registry_id = deployable.metadata.dataset_registry_id,
             name=deployable.metadata.name, 
             version=self.db.get_model_version_increment(
                 name = deployable.metadata.name, 
-                dataset_id=deployable.metadata.dataset_id, 
+                dataset_id=deployable.metadata.dataset_registry_id, 
                 target = deployable.metadata.target
             ),
             target = deployable.metadata.target, 
@@ -97,8 +97,8 @@ class Registry:
         return registry_ref
     
     def pull_model_from_registry(self, id: int) -> Deployable:
-        model = self.db.select_model_by_id(id)
-        return Deployable(**model)
+        registry_item = self.db.select_model_by_id(id)
+        return Deployable.restore(registry_item)
 
         
 

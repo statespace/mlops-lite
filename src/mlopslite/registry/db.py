@@ -6,8 +6,8 @@ from sqlalchemy import create_engine, func, inspect, select, delete, and_
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import Select
 
-from mlopslite.registry.datamodel import (Base, DataRegistry, ModelRegistry,
-                                          DataRegistryColumns,
+from mlopslite.registry.datamodel import (Base, DatasetRegistry, DeployableRegistry,
+                                          DatasetRegistryColumns,
                                           get_datamodel_table_names)
 from mlopslite.registry.registryconfig import RegistryConfig
 from mlopslite.alembic_setup import get_alembic_ini, get_migration_script_location
@@ -72,9 +72,9 @@ class DataBase:
 
     def get_dataset_version_increment(self, name: str) -> int:
         stmt = (
-            select(func.max(DataRegistry.version).label("version"))
-            .where(DataRegistry.name == name)
-            .group_by(DataRegistry.name)
+            select(func.max(DatasetRegistry.version).label("version"))
+            .where(DatasetRegistry.name == name)
+            .group_by(DatasetRegistry.name)
         )
 
         response = self.execute_select_query(stmt)
@@ -86,16 +86,16 @@ class DataBase:
 
     def get_dataset_reference_by_hash(self, hash: str) -> dict | None:
         stmt = select(
-            DataRegistry.id,
-            DataRegistry.name,
-            DataRegistry.version,
-            DataRegistry.hash,
-        ).where(DataRegistry.hash == hash)
+            DatasetRegistry.id,
+            DatasetRegistry.name,
+            DatasetRegistry.version,
+            DatasetRegistry.hash,
+        ).where(DatasetRegistry.hash == hash)
 
         response = self.execute_select_query(stmt)
         return None if len(response) == 0 else response[0]
 
-    def insert_dataset_returning_reference(self, dr: DataRegistry) -> dict:
+    def insert_dataset_returning_reference(self, dr: DatasetRegistry) -> dict:
         with self.session.begin() as session:
             session.add(dr)
             session.flush()
@@ -106,11 +106,11 @@ class DataBase:
             return out
 
     def select_dataset_by_id(self, id: int) -> dict:
-        stmt_dataset = select(*DataRegistry.__table__.columns).where(
-            DataRegistry.id == id
+        stmt_dataset = select(*DatasetRegistry.__table__.columns).where(
+            DatasetRegistry.id == id
         )
-        stmt_columns = select(*DataRegistryColumns.__table__.columns).where(
-            DataRegistryColumns.data_registry_id == id
+        stmt_columns = select(*DatasetRegistryColumns.__table__.columns).where(
+            DatasetRegistryColumns.dataset_registry_id == id
         )
 
         return {
@@ -120,13 +120,13 @@ class DataBase:
     
     def list_datasets(self) -> dict:
 
-        stmt = (select(DataRegistry.id,
-                      DataRegistry.name,
-                      DataRegistry.version,
-                      DataRegistry.size_cols,
-                      DataRegistry.size_rows,
-                      DataRegistry.description)
-                .order_by(DataRegistry.id)
+        stmt = (select(DatasetRegistry.id,
+                      DatasetRegistry.name,
+                      DatasetRegistry.version,
+                      DatasetRegistry.size_cols,
+                      DatasetRegistry.size_rows,
+                      DatasetRegistry.description)
+                .order_by(DatasetRegistry.id)
         )
         
         return self.execute_select_query(stmt)
@@ -134,24 +134,24 @@ class DataBase:
     def delete_dataset(self, id: int):
 
         with self.session.begin() as session:
-            stmt = delete(DataRegistry).where(DataRegistry.id == id)
+            stmt = delete(DatasetRegistry).where(DatasetRegistry.id == id)
             session.execute(stmt)
 
     def get_model_reference_by_hash(self, hash: str) -> dict:
 
         stmt = select(
-            ModelRegistry.id,
-            ModelRegistry.name,
-            ModelRegistry.version,
-            ModelRegistry.hash
+            DeployableRegistry.id,
+            DeployableRegistry.name,
+            DeployableRegistry.version,
+            DeployableRegistry.hash
         ).where(
-            ModelRegistry.hash == hash
+            DeployableRegistry.hash == hash
         )
 
         response = self.execute_select_query(stmt)
         return None if len(response) == 0 else response[0]
     
-    def insert_model_returning_reference(self, mr: ModelRegistry) -> dict:
+    def insert_model_returning_reference(self, mr: DeployableRegistry) -> dict:
         with self.session.begin() as session:
             session.add(mr)
             session.flush()
@@ -161,9 +161,12 @@ class DataBase:
         
     def get_model_version_increment(self, name: str, dataset_id: int, target: str) -> int:
         stmt = (
-            select(func.max(ModelRegistry.version).label("version"))
-            .where(and_(ModelRegistry.name == name, ModelRegistry.data_registry_id == dataset_id, ModelRegistry.target == target))
-            .group_by(ModelRegistry.name)
+            select(func.max(DeployableRegistry.version).label("version"))
+            .where(and_(
+                DeployableRegistry.name == name, 
+                DeployableRegistry.dataset_registry_id == dataset_id, 
+                DeployableRegistry.target == target))
+            .group_by(DeployableRegistry.name)
         )
 
         response = self.execute_select_query(stmt)
@@ -174,8 +177,8 @@ class DataBase:
             return response[0]["version"] + 1
         
     def select_model_by_id(self, id: int) -> dict:
-        stmt = select(*ModelRegistry.__table__.columns).where(
-            ModelRegistry.id == id
+        stmt = select(*DeployableRegistry.__table__.columns).where(
+            DeployableRegistry.id == id
         )
 
         response = self.execute_select_query(stmt)
@@ -185,13 +188,13 @@ class DataBase:
     def list_models(self):
         
         stmt = select(
-            ModelRegistry.id,
-            ModelRegistry.name,
-            ModelRegistry.version,
-            ModelRegistry.data_registry_id,
-            ModelRegistry.estimator_class,
-            ModelRegistry.estimator_type,
-            ModelRegistry.description
-        ).order_by(ModelRegistry.id)
+            DeployableRegistry.id,
+            DeployableRegistry.name,
+            DeployableRegistry.version,
+            DeployableRegistry.dataset_registry_id,
+            DeployableRegistry.estimator_class,
+            DeployableRegistry.estimator_type,
+            DeployableRegistry.description
+        ).order_by(DeployableRegistry.id)
 
         return self.execute_select_query(stmt)

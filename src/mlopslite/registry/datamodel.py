@@ -19,8 +19,8 @@ class Base(DeclarativeBase, MappedAsDataclass):
     type_annotation_map = {dict[str, Any]: JSON}
 
 
-class DataRegistry(Base):
-    __tablename__ = "data_registry"
+class DatasetRegistry(Base):
+    __tablename__ = "dataset_registry"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True, init=False)
     name: Mapped[str]
@@ -31,19 +31,19 @@ class DataRegistry(Base):
     size_rows: Mapped[int]
     hash: Mapped[str] = mapped_column(unique=True)
 
-    columns: Mapped[List["DataRegistryColumns"]] = relationship(
+    columns: Mapped[List["DatasetRegistryColumns"]] = relationship(
         default_factory=list, back_populates="data", cascade="all, delete-orphan"
     )
 
     __table_args__ = (UniqueConstraint("name", "version"),)
 
 
-class DataRegistryColumns(Base):
-    __tablename__ = "data_registry_columns"
+class DatasetRegistryColumns(Base):
+    __tablename__ = "dataset_registry_columns"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True, init=False)
-    data_registry_id: Mapped[int] = mapped_column(
-        ForeignKey("data_registry.id"), init=False
+    dataset_registry_id: Mapped[int] = mapped_column(
+        ForeignKey("dataset_registry.id"), init=False
     )
     column_name: Mapped[str]
     original_dtype: Mapped[str]
@@ -54,14 +54,14 @@ class DataRegistryColumns(Base):
     max_value_num: Mapped[float] = mapped_column(nullable=True)
     #unique_values: Mapped[list[str]]
 
-    data: Mapped["DataRegistry"] = relationship(back_populates="columns")
+    data: Mapped["DatasetRegistry"] = relationship(back_populates="columns")
 
-class ModelRegistry(Base):
-    __tablename__ = "model_registry"
+class DeployableRegistry(Base):
+    __tablename__ = "deployable_registry"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True, init=False)
-    data_registry_id: Mapped[int] = mapped_column(
-        ForeignKey("data_registry.id")
+    dataset_registry_id: Mapped[int] = mapped_column(
+        ForeignKey("dataset_registry.id")
     )
     name: Mapped[str]
     version: Mapped[int]
