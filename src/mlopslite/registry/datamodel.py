@@ -1,6 +1,7 @@
 import inspect
 import sys
 from typing import Any, List
+from datetime import datetime
 
 from sqlalchemy import JSON, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import (DeclarativeBase, Mapped, MappedAsDataclass,
@@ -72,6 +73,57 @@ class DeployableRegistry(Base):
     estimator_class: Mapped[str]
     deployable: Mapped[bytes]
     variables: Mapped[dict[str, Any]]
-    hash: Mapped[str]
+    hash: Mapped[str] = mapped_column(unique=True)
+
+class ModelExecutionLog(Base):
+    __tablename__ = "model_execution_log"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True, init=False)
+    deployable_id: Mapped[int] = mapped_column(ForeignKey("deployable_registry.id"))
+    request_time: Mapped[datetime]
+    request_size: Mapped[int]
+
+    execution_log: Mapped[List["ExecutionItems"]] = relationship(
+        default_factory=list, back_populates="execution_log_item", cascade="all, delete-orphan"
+    )
+
+class ExecutionItems(Base):
+    __tablename__ = "execution_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True, init=False)
+    execution_log_id: Mapped[int] = mapped_column(ForeignKey("model_execution_log.id"), init=False)
+    reference_id: Mapped[str] = mapped_column(nullable=True)
+
+    execution_log_item: Mapped["ModelExecutionLog"] = relationship(back_populates="execution_log")
+    
+    request_items: Mapped[List["RequestItems"]] = relationship(
+        default_factory=list, back_populates="data", cascade="all, delete-orphan"
+    )
+
+    response_items: Mapped[List["ResponseItems"]] = relationship(
+        default_factory=list, back_populates="data", cascade="all, delete-orphan"
+    )
+
+class RequestItems(Base):
+    __tablename__ = "request_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True, init=False)
+    execution_items_id: Mapped[int] = mapped_column(ForeignKey("execution_items.id"), init=False)
+    varname: Mapped[str]
+    in_value: Mapped[str]
+
+    data: Mapped["ExecutionItems"] = relationship(back_populates="request_items")
+
+class ResponseItems(Base):
+    __tablename__ = "response_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True, init=False)
+    execution_items_id: Mapped[int] = mapped_column(ForeignKey("execution_items.id"), init=False)
+    classname: Mapped[str] = mapped_column(nullable=True)
+    out_value: Mapped[float]
+
+    data: Mapped["ExecutionItems"] = relationship(back_populates="response_items")
+
+
 
 

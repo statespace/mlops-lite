@@ -6,6 +6,7 @@ from mlopslite.artifacts.model import Deployable
 from mlopslite.registry import datamodel
 from mlopslite.registry.db import DataBase
 from mlopslite.registry.registryconfig import RegistryConfig
+from datetime import datetime
 
 
 class Registry:
@@ -99,7 +100,53 @@ class Registry:
     def pull_model_from_registry(self, id: int) -> Deployable:
         registry_item = self.db.select_model_by_id(id)
         return Deployable.restore(registry_item)
+    
+    def log_execution(self, deployable_id: int, input: dict, output: dict) -> None:
 
         
+        # some additional validation, sanity check, logging etc goes here before sending to DB
+
+        root_entry = datamodel.ModelExecutionLog(
+            deployable_id=deployable_id, 
+            request_time=datetime.utcnow(),
+            request_size=len(input)
+        )
+
+        for item in zip(input, output):
+
+            #print(item[1]['reference_id'])
+            execution_items_link = datamodel.ExecutionItems(
+                    reference_id=item[1]['reference_id'],
+                    execution_log_item = root_entry
+                )
+
+            root_entry.execution_log.append(execution_items_link)
+            
+
+            for k,v in item[0].items():
+
+                if k not in ['reference_id']:
+
+                    request = datamodel.RequestItems(
+                        varname=k,
+                        in_value=v, 
+                        data=execution_items_link
+                    )
+
+                    execution_items_link.request_items.append(request)
+
+            for k,v in item[1]['results'].items():
+
+                response = datamodel.ResponseItems(
+                    classname=str(k),
+                    out_value=v,
+                    data = execution_items_link
+                )
+
+                execution_items_link.response_items.append(response)
+
+        self.db.log_execution(root_entry)
+
+                
 
 

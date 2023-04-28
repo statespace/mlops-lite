@@ -6,8 +6,11 @@ from sqlalchemy import create_engine, func, inspect, select, delete, and_
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import Select
 
-from mlopslite.registry.datamodel import (Base, DatasetRegistry, DeployableRegistry,
-                                          DatasetRegistryColumns,
+from mlopslite.registry.datamodel import (Base, 
+                                          DatasetRegistry, 
+                                          DeployableRegistry,
+                                          DatasetRegistryColumns, 
+                                          ModelExecutionLog, 
                                           get_datamodel_table_names)
 from mlopslite.registry.registryconfig import RegistryConfig
 from mlopslite.alembic_setup import get_alembic_ini, get_migration_script_location
@@ -198,3 +201,8 @@ class DataBase:
         ).order_by(DeployableRegistry.id)
 
         return self.execute_select_query(stmt)
+    
+    def log_execution(self, log: ModelExecutionLog):
+        with self.session.begin() as session:
+            session.add(log)
+            session.flush()

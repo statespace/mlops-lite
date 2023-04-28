@@ -86,6 +86,10 @@ class MlopsLite:
 
         # log inputs + result
         if log:
-            pass
+            self.registry.log_execution(
+                deployable_id=self.model.metadata.id, 
+                input=input, 
+                output=output
+            )
 
         return output
