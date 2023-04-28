@@ -6,8 +6,6 @@ from mlopslite.registry.registry import Registry
 from mlopslite.registry.registryconfig import RegistryConfig
 from mlopslite.artifacts.model import Deployable
 
-
-
 class MlopsLite:
 
     """
@@ -25,7 +23,7 @@ class MlopsLite:
         # set up Registry object
         self.registry = Registry(config=config)  # default to sqlite, workspace folder sqlite/mlops-lite.db
 
-    def bind_dataset(self, data, name: str, description: str = "", push: bool = True):
+    def bind_dataset(self, data, name: str, description: str = ""):
         dataset = DataSet.create(data = data, name = name, description=description)
         self.push_dataset(dataset=dataset)
 
@@ -62,19 +60,32 @@ class MlopsLite:
 
         self.push_model(model)
 
-        if model.metadata.dataset_id != self.dataset.metadata.id:
-            self.pull_dataset(id = model.metadata.dataset_id)
+        if model.metadata.dataset_registry_id != self.dataset.metadata.id:
+            self.pull_dataset(id = model.metadata.dataset_registry_id)
 
     def pull_model(self, id: int) -> None:
 
         self.model = self.registry.pull_model_from_registry(id = id)
 
-    def push_model(self, model: Deployable) -> None:
+    def push_model(self, deployable: Deployable) -> None:
         # pushing also pulls back the model, to populate proper references
-        registry_ref = self.registry.push_model_to_registry(model = model)
+        registry_ref = self.registry.push_model_to_registry(deployable = deployable)
         self.pull_model(id = registry_ref['id'])
 
     def list_models(self) -> pd.DataFrame:
 
         modlist = self.registry.db.list_models()
         return pd.DataFrame(modlist)
+    
+    def predict(self, input: list[dict] | pd.DataFrame, log: bool = False):
+
+        if isinstance(input, pd.DataFrame):
+            input = input.to_dict('records')
+
+        output = self.model.predict(input)
+
+        # log inputs + result
+        if log:
+            pass
+
+        return output

@@ -5,6 +5,9 @@ from sklearn.pipeline import Pipeline
 import pickle
 from typing import Any
 from hashlib import md5
+from pydantic import create_model
+from pydantic.main import ModelMetaclass
+import pandas as pd
 
 @dataclass
 class DeployableMetadata:
@@ -18,6 +21,9 @@ class DeployableMetadata:
     estimator_type: str
     estimator_class: str
     variables: dict[str, Any]
+
+    def get_variables(self):
+        return self.variables
 
 
 @dataclass
@@ -52,7 +58,7 @@ class Deployable:
             'description': description,
             'estimator_type': get_estimator_type(deployable),
             'estimator_class': str(deployable[-1].__class__),
-            'variables': get_variables(dataset=dataset, deployable=deployable)
+            'variables': variable_metadata(dataset=dataset, deployable=deployable)
         }
 
         return Deployable(deployable, DeployableMetadata(**metadata))
@@ -67,7 +73,7 @@ class Deployable:
         
         deployable = pickle.loads(registry_item['deployable'])
         # check hash?
-        return Deployable(deployable, metadata)
+        return Deployable(deployable, DeployableMetadata(**metadata))
 
     @property
     def classes(self):
@@ -83,15 +89,59 @@ class Deployable:
     def get_data_hash(self) -> str:
         return md5(self.serialize_deployable()).hexdigest()
     
-    def predict(self, input):
+    def construct_pydantic_model(self) -> ModelMetaclass:
+
+
+        variable_definition = self.metadata.get_variables()
+
+        class Config:
+            extra = 'forbid'
+
+        schema_definition = {k: (eval(v), None) for k,v in variable_definition.items()}
+        schema_definition['reference_id'] = (str, None)
+
+        generated_schema = create_model(
+            'inferred_model', 
+            **schema_definition, 
+            __config__=Config
+        )
+
+        return generated_schema
+    
+    def predict(self, input: list[dict]):
+
+        # validation
+        validator_schema = self.construct_pydantic_model()
+        input = [validator_schema(**i).__dict__ for i in input]
+
+        refid_list = [i['reference_id'] for i in input]
+
+        # convert back to DataFrame..? There should be a better way to convert back and forth
+        input = pd.DataFrame(input)
 
         if get_estimator_type(self.deployable) == 'classifier':
-            output = self.deployable.predict_proba(input)
-            output = [dict(zip(self.classes, i)) for i in output]
+
+            model_response = self.deployable.predict_proba(input)
+
+            output = [
+                {
+                    'reference_id': i[0], 
+                    'results': dict(zip(self.classes, i[1]))
+                } for i in zip(refid_list, model_response)
+            ]
         else:
-            output = self.deployable.predict(input)
+            model_response = self.deployable.predict(input)
+
+            output = [
+                {
+                    'reference_id': i[0], 
+                    'results': i[1]
+                } for i in zip(refid_list, model_response)
+            ]
 
         return output
+
+### Function block ###
     
 
 def verify_dataset(metadata: DeployableMetadata, dataset: DataSet):
@@ -141,7 +191,7 @@ def get_estimator_type(deployable):
         return 'regressor'
     return 'unknown'
 
-def get_variables(deployable: Pipeline, dataset: DataSet):
+def variable_metadata(deployable: Pipeline, dataset: DataSet):
     mod_vars = deployable.feature_names_in_
     col_meta = dataset.metadata.column_metadata
 

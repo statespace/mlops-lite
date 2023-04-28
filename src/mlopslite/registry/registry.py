@@ -87,7 +87,7 @@ class Registry:
             description=deployable.metadata.description,
             estimator_type=deployable.metadata.estimator_type, 
             estimator_class=deployable.metadata.estimator_class,
-            deployable=deployable.get_serialized_deployable(),
+            deployable=deployable.serialize_deployable(),
             variables = deployable.metadata.variables,
             hash=deployable.get_data_hash()
         )
