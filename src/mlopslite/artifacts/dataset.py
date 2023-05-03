@@ -5,18 +5,18 @@ from hashlib import md5
 import numpy as np
 import pandas as pd
 
-from mlopslite.artifacts.metadata import DataSetMetadata
+from mlopslite.artifacts.metadata import DatasetMetadata
 
 @dataclass
-class DataSet:
+class Dataset:
 
     """
-    Object containing data and reference to Registry. Which in turn means, that object can be created only through pulling a valid DataSet entry from Registry.
-    Creation (effectively - registration) of new DataSet from file or object reference will first push it to Registry and pull to create proper object.
+    Object containing data and reference to Registry. Which in turn means, that object can be created only through pulling a valid Dataset entry from Registry.
+    Creation (effectively - registration) of new Dataset from file or object reference will first push it to Registry and pull to create proper object.
     """
 
     data: pd.DataFrame
-    metadata: DataSetMetadata
+    metadata: DatasetMetadata
 
 
     def convert_to_dict(self) -> dict:
@@ -33,40 +33,6 @@ class DataSet:
 
         return out
     
-    @staticmethod
-    def create(
-        data: pd.DataFrame | dict, 
-        name: str, 
-        description: str = ""
-    ) -> 'DataSet':
-        
-        # version can not initialize, unless checked against existing registry
-        # this happens upon pushing data to data to the Registry
-        
-        data = pd.DataFrame(data)
-
-        metadata = DataSetMetadata.create(
-            data=data,
-            name=name,
-            version=None, 
-            description=description,
-        )
-    
-        return DataSet(data=data, metadata=metadata)
-
-    @staticmethod
-    def create_from_csv(
-        path: str, 
-        name: str, 
-        description: str = ""
-    ) -> 'DataSet':
-        
-        data = pd.read_csv(path)
-
-        return DataSet.create(
-            data=data, name=name, description=description
-        )
-    
     def get_data_hash(self) -> str:
 
         data = self.convert_to_dict()
@@ -78,3 +44,39 @@ class DataSet:
     def info(self) -> pd.DataFrame:
 
         return pd.DataFrame(self.metadata.column_metadata)
+    
+### Function block
+
+def create_dataset(
+    data: pd.DataFrame | dict, 
+    name: str, 
+    description: str = ""
+) -> 'Dataset':
+    
+    # version can not initialize, unless checked against existing registry
+    # this happens upon pushing data to data to the Registry
+    
+    data = pd.DataFrame(data)
+
+    metadata = DatasetMetadata.create(
+        data=data,
+        name=name,
+        version=None, 
+        description=description,
+    )
+
+    return Dataset(data=data, metadata=metadata)
+
+
+def create_dataset_from_csv(
+    path: str, 
+    name: str, 
+    description: str = ""
+) -> 'Dataset':
+    
+    data = pd.read_csv(path)
+
+    return create_dataset(
+        data=data, name=name, 
+        description=description
+    )

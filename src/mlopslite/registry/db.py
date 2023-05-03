@@ -140,7 +140,7 @@ class DataBase:
             stmt = delete(DatasetRegistry).where(DatasetRegistry.id == id)
             session.execute(stmt)
 
-    def get_model_reference_by_hash(self, hash: str) -> dict:
+    def get_deployable_reference_by_hash(self, hash: str) -> dict:
 
         stmt = select(
             DeployableRegistry.id,
@@ -154,7 +154,7 @@ class DataBase:
         response = self.execute_select_query(stmt)
         return None if len(response) == 0 else response[0]
     
-    def insert_model_returning_reference(self, mr: DeployableRegistry) -> dict:
+    def insert_deployable_returning_reference(self, mr: DeployableRegistry) -> dict:
         with self.session.begin() as session:
             session.add(mr)
             session.flush()
@@ -162,7 +162,7 @@ class DataBase:
 
             return out
         
-    def get_model_version_increment(self, name: str, dataset_id: int, target: str) -> int:
+    def get_deployable_version_increment(self, name: str, dataset_id: int, target: str) -> int:
         stmt = (
             select(func.max(DeployableRegistry.version).label("version"))
             .where(and_(
@@ -179,7 +179,7 @@ class DataBase:
         else:
             return response[0]["version"] + 1
         
-    def select_model_by_id(self, id: int) -> dict:
+    def select_deployable_by_id(self, id: int) -> dict:
         stmt = select(*DeployableRegistry.__table__.columns).where(
             DeployableRegistry.id == id
         )
@@ -188,7 +188,7 @@ class DataBase:
 
         return response[0]
     
-    def list_models(self):
+    def list_deployables(self):
         
         stmt = select(
             DeployableRegistry.id,

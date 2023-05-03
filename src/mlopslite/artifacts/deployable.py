@@ -1,79 +1,19 @@
-from mlopslite.artifacts.dataset import DataSet
+from mlopslite.artifacts.dataset import Dataset
+from mlopslite.artifacts.metadata import DeployableMetadata
 from dataclasses import dataclass
 from sklearn.base import is_classifier, is_regressor
 from sklearn.pipeline import Pipeline
 import pickle
-from typing import Any
 from hashlib import md5
 from pydantic import create_model
 from pydantic.main import ModelMetaclass
 import pandas as pd
 
 @dataclass
-class DeployableMetadata:
-    id: int | None
-    dataset_registry_id: int
-    name: str
-    version: int | None
-    target: str
-    target_mapping: dict | None
-    description: str
-    estimator_type: str
-    estimator_class: str
-    variables: dict[str, Any]
-
-    def get_variables(self):
-        return self.variables
-
-
-@dataclass
 class Deployable:
 
     deployable: Pipeline
     metadata: DeployableMetadata
-
-    @staticmethod
-    def create( 
-            deployable: Pipeline, 
-            dataset: DataSet, 
-            name: str, 
-            target: str, 
-            target_mapping: dict | None = None, 
-            description: str = ""
-    ) -> 'Deployable':
-
-        # potentially can implement various types of deployables
-        # for now, extremely coupled with sklearn Pipeline
-        # expecting BaseEstimator as last element
-        
-        verify_deployable(deployable=deployable)
-
-        metadata = {
-            'id': None,
-            'dataset_registry_id': dataset.metadata.id,
-            'name': name,
-            'version': None,
-            'target': target,
-            'target_mapping': target_mapping,
-            'description': description,
-            'estimator_type': get_estimator_type(deployable),
-            'estimator_class': str(deployable[-1].__class__),
-            'variables': variable_metadata(dataset=dataset, deployable=deployable)
-        }
-
-        return Deployable(deployable, DeployableMetadata(**metadata))
-    
-    @staticmethod
-    def restore(
-        registry_item: dict
-    ) -> 'Deployable':
-        
-        metadata = {key: val for key,
-            val in registry_item.items() if key in DeployableMetadata.__annotations__.keys()}
-        
-        deployable = pickle.loads(registry_item['deployable'])
-        # check hash?
-        return Deployable(deployable, DeployableMetadata(**metadata))
 
     @property
     def classes(self):
@@ -91,8 +31,7 @@ class Deployable:
     
     def construct_pydantic_model(self) -> ModelMetaclass:
 
-
-        variable_definition = self.metadata.get_variables()
+        variable_definition = self.metadata.variables
 
         class Config:
             extra = 'forbid'
@@ -142,9 +81,52 @@ class Deployable:
         return output
 
 ### Function block ###
+
+
+
+def create_deployable( 
+        deployable: Pipeline, 
+        dataset: Dataset, 
+        name: str, 
+        target: str, 
+        target_mapping: dict | None = None, 
+        description: str = ""
+) -> 'Deployable':
+
+    # potentially can implement various types of deployables
+    # for now, extremely coupled with sklearn Pipeline
+    # expecting BaseEstimator as last element
+    
+    verify_deployable(deployable=deployable)
+
+    metadata = {
+        'id': None,
+        'dataset_registry_id': dataset.metadata.id,
+        'name': name,
+        'version': None,
+        'target': target,
+        'target_mapping': target_mapping,
+        'description': description,
+        'estimator_type': get_estimator_type(deployable),
+        'estimator_class': type(deployable[-1]).__name__,
+        'variables': variable_metadata(dataset=dataset, deployable=deployable)
+    }
+
+    return Deployable(deployable, DeployableMetadata(**metadata))
+
+def restore_deployable(
+    registry_item: dict
+) -> 'Deployable':
+    
+    metadata = {key: val for key,
+        val in registry_item.items() if key in DeployableMetadata.__annotations__.keys()}
+    
+    deployable = pickle.loads(registry_item['deployable'])
+    # check hash?
+    return Deployable(deployable, DeployableMetadata(**metadata))
     
 
-def verify_dataset(metadata: DeployableMetadata, dataset: DataSet):
+def verify_dataset(metadata: DeployableMetadata, dataset: Dataset):
 
     """
     Check if dataset contains all input variables and target
@@ -191,7 +173,7 @@ def get_estimator_type(deployable):
         return 'regressor'
     return 'unknown'
 
-def variable_metadata(deployable: Pipeline, dataset: DataSet):
+def variable_metadata(deployable: Pipeline, dataset: Dataset):
     mod_vars = deployable.feature_names_in_
     col_meta = dataset.metadata.column_metadata
 

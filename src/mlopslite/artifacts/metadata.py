@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Any
 
 import pandas as pd
 
@@ -16,7 +17,6 @@ class ColumnMetadata:
     @staticmethod
     def create(key, column: pd.Series) -> "ColumnMetadata":
 
-        #nonetypes = [np.nan, None]
         # summarize col
         summary = {
             "column_name": key,
@@ -46,7 +46,7 @@ def translate_type_to_primitive(dtype):
     return mapper[dtype.kind]
     
 @dataclass
-class DataSetMetadata:
+class DatasetMetadata:
     name: str
     version: int | None
     id: int | None
@@ -62,7 +62,7 @@ class DataSetMetadata:
         version: int, 
         description: str,
         id: int | None = None
-    ) -> "DataSetMetadata":
+    ) -> "DatasetMetadata":
         
         dataset_metadata = {
             "name": name,
@@ -74,4 +74,22 @@ class DataSetMetadata:
             "column_metadata": [ColumnMetadata.create(k, v) for k, v in data.items()],
         }
 
-        return DataSetMetadata(**dataset_metadata)
+        return DatasetMetadata(**dataset_metadata)
+
+@dataclass
+class DeployableMetadata:
+
+    """
+    Container for the metadata of Deployable object.
+    """
+
+    id: int | None
+    dataset_registry_id: int
+    name: str
+    version: int | None
+    target: str
+    target_mapping: dict | None
+    description: str
+    estimator_type: str
+    estimator_class: str
+    variables: dict[str, Any]

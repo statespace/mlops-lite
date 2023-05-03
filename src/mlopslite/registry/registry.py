@@ -1,8 +1,8 @@
 import pandas as pd
 
-from mlopslite.artifacts.metadata import DataSetMetadata
-from mlopslite.artifacts.dataset import DataSet
-from mlopslite.artifacts.model import Deployable
+from mlopslite.artifacts.metadata import DatasetMetadata
+from mlopslite.artifacts.dataset import Dataset
+from mlopslite.artifacts.deployable import Deployable, restore_deployable
 from mlopslite.registry import datamodel
 from mlopslite.registry.db import DataBase
 from mlopslite.registry.registryconfig import RegistryConfig
@@ -18,7 +18,7 @@ class Registry:
     # fs: FileSystem
     # config: RegistryConfig
 
-    def pull_dataset_from_registry(self, id: int) -> DataSet:
+    def pull_dataset_from_registry(self, id: int) -> Dataset:
         ds = self.db.select_dataset_by_id(id)
 
         dataset = ds["dataset"]["data"]
@@ -26,7 +26,7 @@ class Registry:
         dtype_map = {i["column_name"]: i["original_dtype"] for i in ds["columns"]}
         dataset = pd.DataFrame(dataset).astype(dtype=dtype_map)
 
-        metadata = DataSetMetadata.create(
+        metadata = DatasetMetadata.create(
             data = dataset, 
             name = ds["dataset"]["name"], 
             version = ds["dataset"]["version"], 
@@ -34,20 +34,20 @@ class Registry:
             description=ds["dataset"]["description"]
         )
 
-        return DataSet(data=dataset, metadata=metadata)
+        return Dataset(data=dataset, metadata=metadata)
 
-    def push_dataset_to_registry(self, dataset: DataSet) -> dict:
+    def push_dataset_to_registry(self, dataset: Dataset) -> dict:
         """
-        Add new dataset to the registry
+        Add new Dataset to the registry
         """
 
         hash = dataset.get_data_hash()        
         registry_ref = self.db.get_dataset_reference_by_hash(hash)
         if registry_ref is not None:
-            print("Dataset already exists, returning referenced dataset instead of pushing!")
+            print("Dataset already exists, returning referenced Dataset instead of pushing!")
             return registry_ref
 
-        # dataset table
+        # Dataset table
 
         dr = datamodel.DatasetRegistry(
             name=dataset.metadata.name,
@@ -67,10 +67,10 @@ class Registry:
 
         return registry_ref
     
-    def push_model_to_registry(self, deployable: Deployable) -> dict:
+    def push_deployable_to_registry(self, deployable: Deployable) -> dict:
 
         hash = deployable.get_data_hash()
-        registry_ref = self.db.get_model_reference_by_hash(hash)
+        registry_ref = self.db.get_deployable_reference_by_hash(hash)
         if registry_ref is not None:
             print("Model already exists, returning referenced model instead of pushing!")
             return registry_ref
@@ -78,7 +78,7 @@ class Registry:
         mr = datamodel.DeployableRegistry(
             dataset_registry_id = deployable.metadata.dataset_registry_id,
             name=deployable.metadata.name, 
-            version=self.db.get_model_version_increment(
+            version=self.db.get_deployable_version_increment(
                 name = deployable.metadata.name, 
                 dataset_id=deployable.metadata.dataset_registry_id, 
                 target = deployable.metadata.target
@@ -93,18 +93,21 @@ class Registry:
             hash=deployable.get_data_hash()
         )
 
-        registry_ref = self.db.insert_model_returning_reference(mr=mr)
+        registry_ref = self.db.insert_deployable_returning_reference(mr=mr)
 
         return registry_ref
     
-    def pull_model_from_registry(self, id: int) -> Deployable:
-        registry_item = self.db.select_model_by_id(id)
-        return Deployable.restore(registry_item)
+    def pull_deployable_from_registry(self, id: int) -> Deployable:
+        registry_item = self.db.select_deployable_by_id(id)
+        return restore_deployable(registry_item)
     
     def log_execution(self, deployable_id: int, input: dict, output: dict) -> None:
 
+        """
+        Map deployable results to ORM
+        """
         
-        # some additional validation, sanity check, logging etc goes here before sending to DB
+        #TODO some additional validation, sanity check, logging etc goes here before sending to DB
 
         root_entry = datamodel.ModelExecutionLog(
             deployable_id=deployable_id, 
@@ -114,7 +117,6 @@ class Registry:
 
         for item in zip(input, output):
 
-            #print(item[1]['reference_id'])
             execution_items_link = datamodel.ExecutionItems(
                     reference_id=item[1]['reference_id'],
                     execution_log_item = root_entry
@@ -122,7 +124,6 @@ class Registry:
 
             root_entry.execution_log.append(execution_items_link)
             
-
             for k,v in item[0].items():
 
                 if k not in ['reference_id']:

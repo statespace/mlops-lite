@@ -77,7 +77,8 @@ from sklearn.model_selection import train_test_split
 
 X_train, X_test, y_train, y_test = train_test_split(
     client.dataset.data.drop('target', axis = 1), 
-    client.dataset.data['target']
+    client.dataset.data['target'],
+    random_state = 1
 )
 column_def = client.dataset.info()
 num_cols = column_def.loc[column_def['converted_dtype'] == 'float', 'column_name'].to_list()
@@ -95,30 +96,31 @@ model = make_pipeline(preproc, LogisticRegression())
 model.fit(X = X_train, y = y_train)
 ```
 
-## Adding model to the registry
+## Adding deployable (model) to the registry
 
 This will persist the model in the database. Similarly like dataset, it will check md5 of model artifact and will not write duplicates. And will increment version if artifact is diferent but name is the same.
 
 ```python
-client.bind_model(object = model, name = 'testmodel', target = 'target')
+client.bind_deployable(deployable = model, name = 'testmodel', target = 'target')
 ```
-Similar to datasets, list all models in the registry:
+Similar to datasets, list all deployables in the registry:
 
 ```python
-client.list_models()
+client.list_deployables()
 ```
-|    |   id | name      |   version |   dataset_registry_id | estimator_class                                             | estimator_type   | description   |
-|---:|-----:|:----------|----------:|----------------------:|:------------------------------------------------------------|:-----------------|:--------------|
-|  0 |    1 | testmodel |         1 |                     1 | <class 'sklearn.linear_model._logistic.LogisticRegression'> | classifier       |               |
+|    |   id | name      |   version |   dataset_registry_id | estimator_class    | estimator_type   | description   |
+|---:|-----:|:----------|----------:|----------------------:|:-------------------|:-----------------|:--------------|
+|  0 |    1 | testmodel |         1 |                     1 | LogisticRegression | classifier       |               |
 
 
-## Model execution 
+## Deployable execution 
 
 Assuming this is a new python session.
 
 ```python
 from mlopslite.client import MlopsLite
 client = MlopsLite()
+client.pull_deployable(1)
 
 test = [
     {
@@ -136,19 +138,19 @@ test = [
     }
 ]
 
-client.model.predict(test, log = True)
+client.predict(test, log = True)
 
 """
 output:
 
 [{'reference_id': None,
-  'results': {'setosa': 0.7770369931272464,
-   'versicolor': 0.22263517173716368,
-   'virginica': 0.00032783513558999345}},
+  'results': {'setosa': 0.7817632336603132,
+   'versicolor': 0.21727812223107698,
+   'virginica': 0.0009586441086099546}},
  {'reference_id': 'some_external_id',
-  'results': {'setosa': 0.9021059071941613,
-   'versicolor': 0.0973836569186195,
-   'virginica': 0.0005104358872192664}}]
+  'results': {'setosa': 0.9250271226821645,
+   'versicolor': 0.07308630128882285,
+   'virginica': 0.001886576029012563}}]
 """
 ```
 
