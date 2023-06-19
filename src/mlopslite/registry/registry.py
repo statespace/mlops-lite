@@ -57,6 +57,7 @@ class Registry:
             size_rows=dataset.metadata.size_rows,
             size_cols=dataset.metadata.size_cols,
             hash=hash,
+            created_at=datetime.utcnow()
         )
 
         for i in dataset.metadata.column_metadata:
@@ -90,7 +91,8 @@ class Registry:
             estimator_class=deployable.metadata.estimator_class,
             deployable=deployable.serialize_deployable(),
             variables = deployable.metadata.variables,
-            hash=deployable.get_data_hash()
+            hash=hash,
+            created_at=datetime.utcnow()
         )
 
         registry_ref = self.db.insert_deployable_returning_reference(mr=mr)

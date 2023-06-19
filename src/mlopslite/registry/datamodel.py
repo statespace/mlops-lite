@@ -31,6 +31,7 @@ class DatasetRegistry(Base):
     size_cols: Mapped[int]
     size_rows: Mapped[int]
     hash: Mapped[str] = mapped_column(unique=True)
+    created_at: Mapped[datetime]
 
     columns: Mapped[List["DatasetRegistryColumns"]] = relationship(
         default_factory=list, back_populates="data", cascade="all, delete-orphan"
@@ -74,8 +75,9 @@ class DeployableRegistry(Base):
     deployable: Mapped[bytes]
     variables: Mapped[dict[str, Any]]
     hash: Mapped[str] = mapped_column(unique=True)
+    created_at: Mapped[datetime]
 
-class ModelExecutionLog(Base):
+class ExecutionLog(Base):
     __tablename__ = "model_execution_log"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True, init=False)
@@ -94,7 +96,7 @@ class ExecutionItems(Base):
     execution_log_id: Mapped[int] = mapped_column(ForeignKey("model_execution_log.id"), init=False)
     reference_id: Mapped[str] = mapped_column(nullable=True)
 
-    execution_log_item: Mapped["ModelExecutionLog"] = relationship(back_populates="execution_log")
+    execution_log_item: Mapped["ExecutionLog"] = relationship(back_populates="execution_log")
     
     request_items: Mapped[List["RequestItems"]] = relationship(
         default_factory=list, back_populates="data", cascade="all, delete-orphan"

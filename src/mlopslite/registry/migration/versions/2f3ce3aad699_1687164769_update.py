@@ -1,8 +1,8 @@
-"""1683122910_update
+"""1687164769_update
 
-Revision ID: 1c31cfa68a4e
+Revision ID: 2f3ce3aad699
 Revises: 
-Create Date: 2023-05-03 17:08:30.411584
+Create Date: 2023-06-19 11:52:49.876105
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '1c31cfa68a4e'
+revision = '2f3ce3aad699'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -27,6 +27,7 @@ def upgrade() -> None:
     sa.Column('size_cols', sa.Integer(), nullable=False),
     sa.Column('size_rows', sa.Integer(), nullable=False),
     sa.Column('hash', sa.String(), nullable=False),
+    sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('hash'),
     sa.UniqueConstraint('name', 'version')
@@ -57,6 +58,7 @@ def upgrade() -> None:
     sa.Column('deployable', sa.LargeBinary(), nullable=False),
     sa.Column('variables', sa.JSON(), nullable=False),
     sa.Column('hash', sa.String(), nullable=False),
+    sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.ForeignKeyConstraint(['dataset_registry_id'], ['dataset_registry.id'], ),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('hash')

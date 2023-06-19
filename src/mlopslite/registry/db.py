@@ -10,7 +10,7 @@ from mlopslite.registry.datamodel import (Base,
                                           DatasetRegistry, 
                                           DeployableRegistry,
                                           DatasetRegistryColumns, 
-                                          ModelExecutionLog, 
+                                          ExecutionLog, 
                                           get_datamodel_table_names)
 from mlopslite.registry.registryconfig import RegistryConfig
 from mlopslite.alembic_setup import get_alembic_ini, get_migration_script_location
@@ -93,6 +93,7 @@ class DataBase:
             DatasetRegistry.name,
             DatasetRegistry.version,
             DatasetRegistry.hash,
+            DatasetRegistry.created_at
         ).where(DatasetRegistry.hash == hash)
 
         response = self.execute_select_query(stmt)
@@ -128,7 +129,9 @@ class DataBase:
                       DatasetRegistry.version,
                       DatasetRegistry.size_cols,
                       DatasetRegistry.size_rows,
-                      DatasetRegistry.description)
+                      DatasetRegistry.description,
+                      DatasetRegistry.created_at
+                      )
                 .order_by(DatasetRegistry.id)
         )
         
@@ -197,12 +200,13 @@ class DataBase:
             DeployableRegistry.dataset_registry_id,
             DeployableRegistry.estimator_class,
             DeployableRegistry.estimator_type,
-            DeployableRegistry.description
+            DeployableRegistry.description,
+            DeployableRegistry.created_at
         ).order_by(DeployableRegistry.id)
 
         return self.execute_select_query(stmt)
     
-    def log_execution(self, log: ModelExecutionLog):
+    def log_execution(self, log: ExecutionLog):
         with self.session.begin() as session:
             session.add(log)
             session.flush()
